@@ -37,7 +37,9 @@ public static class GamesEndpoints
     public static RouteGroupBuilder MapGamesEndpoints(this WebApplication app)
     {
         // Defines common prefixes for all routes, routes chain into group games
-        var group = app.MapGroup("games");
+        var group = app.MapGroup("games")
+                        .WithParameterValidation();
+                        // Appropriate endpoints filters will be applied and recognize data annotations specified in CreateGameDto
 
         // GET /games
         group.MapGet("/", () => games);
@@ -69,6 +71,7 @@ public static class GamesEndpoints
             // third param is what we send back to client in payload
             return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, game);
         });
+        
 
         // PUT /games
         group.MapPut("/{id}", (int id, UpdateGameDto updatedGame) => 
