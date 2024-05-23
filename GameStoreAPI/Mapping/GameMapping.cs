@@ -3,6 +3,7 @@ using GameStoreAPI.Entities;
 
 namespace GameStoreAPI.Mapping;
 
+// This is to help us map our entities to DTOs and vice versa
 public static class GameMapping
 {
     public static Game ToEntity(this CreateGameDto game)
