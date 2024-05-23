@@ -1,5 +1,7 @@
 ﻿using System.Data;
 using GameStoreAPI.Contracts;
+using GameStoreAPI.Data;
+using GameStoreAPI.Entities;
 
 namespace GameStoreAPI.Endpoints;
 
@@ -54,22 +56,34 @@ public static class GamesEndpoints
         .WithName(GetGameEndpointName);
 
         // POST /games
-        group.MapPost("/", (CreateGameDto newGame) => 
+        group.MapPost("/", (CreateGameDto newGame, GameStoreContext dbContext) => 
         {
-            GameDto game = new(
-                games.Count + 1,
-                newGame.Name,
-                newGame.Genre,
-                newGame.Price,
-                newGame.ReleaseDate
-            );
+            Game game = new()
+            {
+                Name = newGame.Name,
+                Genre = dbContext.Genres.Find(newGame.GenreId),
+                GenreId = newGame.GenreId,
+                Price = newGame.Price,
+                ReleaseDate = newGame.ReleaseDate
+            };
             
-            games.Add(game);
+            dbContext.Games.Add(game);
+            dbContext.SaveChanges();
+
+            // We should not return internal entities back to client, only our DTOs available hence why we're converting game into gameDto
+            GameDto gameDto = new(
+                game.Id,
+                game.Name,
+                // ! states that you're not expecting property to be null at any point
+                game.Genre!.Name,
+                game.Price,
+                game.ReleaseDate
+            );
 
             // Provides location header to the client to tell it where the resource is created, first param is name of route, second param
             // is the value that needs to be provided to the route in the first param (standard is use anonymous type, being new {id = game.id})
             // third param is what we send back to client in payload
-            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, game);
+            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, gameDto);
         });
         
 

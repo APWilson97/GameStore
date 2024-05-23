@@ -9,7 +9,7 @@ Content-Type: application/json
 
 {
     "name": "Mario Odyssey",
-    "genre": "Platformer",
+    "genreId": 1,
     "price": 59.99,
     "releaseDate": "2017-10-27"
 }
