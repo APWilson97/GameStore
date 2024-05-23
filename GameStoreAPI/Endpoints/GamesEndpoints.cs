@@ -2,6 +2,7 @@
 using GameStoreAPI.Contracts;
 using GameStoreAPI.Data;
 using GameStoreAPI.Entities;
+using GameStoreAPI.Mapping;
 
 namespace GameStoreAPI.Endpoints;
 
@@ -58,32 +59,18 @@ public static class GamesEndpoints
         // POST /games
         group.MapPost("/", (CreateGameDto newGame, GameStoreContext dbContext) => 
         {
-            Game game = new()
-            {
-                Name = newGame.Name,
-                Genre = dbContext.Genres.Find(newGame.GenreId),
-                GenreId = newGame.GenreId,
-                Price = newGame.Price,
-                ReleaseDate = newGame.ReleaseDate
-            };
+            Game game = newGame.ToEntity();
+            game.Genre = dbContext.Genres.Find(newGame.GenreId);
             
             dbContext.Games.Add(game);
             dbContext.SaveChanges();
 
             // We should not return internal entities back to client, only our DTOs available hence why we're converting game into gameDto
-            GameDto gameDto = new(
-                game.Id,
-                game.Name,
-                // ! states that you're not expecting property to be null at any point
-                game.Genre!.Name,
-                game.Price,
-                game.ReleaseDate
-            );
 
             // Provides location header to the client to tell it where the resource is created, first param is name of route, second param
             // is the value that needs to be provided to the route in the first param (standard is use anonymous type, being new {id = game.id})
             // third param is what we send back to client in payload
-            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, gameDto);
+            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, game.ToDto());
         });
         
 
