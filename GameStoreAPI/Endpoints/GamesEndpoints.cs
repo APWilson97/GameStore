@@ -3,6 +3,7 @@ using GameStoreAPI.Contracts;
 using GameStoreAPI.Data;
 using GameStoreAPI.Entities;
 using GameStoreAPI.Mapping;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameStoreAPI.Endpoints;
 
@@ -12,29 +13,8 @@ public static class GamesEndpoints
 {
     const string GetGameEndpointName = "GetGame";
 
-    private static readonly List<GameDto> games = [
-        new GameDto(
-            1,
-            "Xenogears",
-            "JRPG",
-            59.99M,
-            new DateOnly(1998, 2, 11)
-        ), 
-        new GameDto(
-            2, 
-            "R4: Ridge Racer Type 4",
-            "Racing",
-            29.99M,
-            new DateOnly(1998, 12, 3)
-        ),
-        new GameDto(
-            3,
-            "Diablo 2",
-            "ARPG",
-            49.99M,
-            new DateOnly(2000, 6, 28)
-        )
-    ];
+    // Dependency injection of GameStoreContext into endpoints, this removes the need for in memory database through using a List of games
+    // previously and properly tracks and persists changes to entities in the database, as well as retrieval of those entities to send back to client
 
     // this keyword makes it into extension method, this method is going to show up as new method of WebApplication class
     public static RouteGroupBuilder MapGamesEndpoints(this WebApplication app)
@@ -45,14 +25,22 @@ public static class GamesEndpoints
                         // Appropriate endpoints filters will be applied and recognize data annotations specified in CreateGameDto
 
         // GET /games
-        group.MapGet("/", () => games);
+        group.MapGet("/", (GameStoreContext dbContext) => 
+        {
+            return dbContext.Games
+                        // Ensures Genre property is not null for correct mapping into game summary dto, includes Genre property for each Game
+                        .Include(game => game.Genre)
+                        .Select(game => game.ToGameSummaryDto())
+                        // Tells EFC to not do any tracking of the return entities, just send it back to client for performance
+                        .AsNoTracking();
+        });
 
         // GET /games/1
-        group.MapGet("/{id}", (int id) => 
+        group.MapGet("/{id}", (int id, GameStoreContext dbContext) => 
         {
-            GameDto? game = games.Find(game => game.Id == id);
+            Game? game = dbContext.Games.Find(id);
             // Have to return value with type IResult, hence why we cannot just return 'game' in this case
-            return game is null ? Results.NotFound() : Results.Ok(game);
+            return game is null ? Results.NotFound() : Results.Ok(game.ToGameDetailsDto());
         })
         .WithName(GetGameEndpointName);
 
@@ -60,7 +48,6 @@ public static class GamesEndpoints
         group.MapPost("/", (CreateGameDto newGame, GameStoreContext dbContext) => 
         {
             Game game = newGame.ToEntity();
-            game.Genre = dbContext.Genres.Find(newGame.GenreId);
             
             dbContext.Games.Add(game);
             dbContext.SaveChanges();
@@ -70,36 +57,36 @@ public static class GamesEndpoints
             // Provides location header to the client to tell it where the resource is created, first param is name of route, second param
             // is the value that needs to be provided to the route in the first param (standard is use anonymous type, being new {id = game.id})
             // third param is what we send back to client in payload
-            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, game.ToDto());
+            return Results.CreatedAtRoute(GetGameEndpointName, new { id = game.Id }, game.ToGameDetailsDto());
         });
         
 
         // PUT /games
-        group.MapPut("/{id}", (int id, UpdateGameDto updatedGame) => 
+        group.MapPut("/{id}", (int id, UpdateGameDto updatedGame, GameStoreContext dbContext) => 
         {
-            var index = games.FindIndex(game => game.Id == id);
+            var existingGame = dbContext.Games.Find(id);
             
-            if (index == -1)
+            if (existingGame == null)
             {
                 return Results.NotFound();
             }
 
-            games[index] = new GameDto(
-                id,
-                updatedGame.Name,
-                updatedGame.Genre,
-                updatedGame.Price,
-                updatedGame.ReleaseDate
-            );
+            dbContext.Entry(existingGame)
+                        .CurrentValues
+                        .SetValues(updatedGame.ToEntity(id));
+            
+            dbContext.SaveChanges();
 
             // Convention is to return NoContent back to client for PUT operation
             return Results.NoContent();
         });
 
         // DELETE /games
-        group.MapDelete("/{id}", (int id) => 
+        group.MapDelete("/{id}", (int id, GameStoreContext dbContext) => 
         {
-            games.RemoveAll(game => game.Id == id);
+            dbContext.Games
+                        .Where(game => game.Id == id)
+                        .ExecuteDelete();
 
             return Results.NoContent();
         });

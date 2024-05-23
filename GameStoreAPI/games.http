@@ -19,11 +19,11 @@ PUT http://localhost:5016/games/2
 Content-Type: application/json
 
 {
-    "name": "Ridge Racer",
-    "genre": "Racing",
+    "name": "Mario Sunshine",
+    "genreId": 2,
     "price": 19.99,
     "releaseDate": "1998-12-03"
 }
 
 ###
-DELETE http://localhost:5016/games/2
+DELETE http://localhost:5016/games/3
