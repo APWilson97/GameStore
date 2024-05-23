@@ -25,32 +25,33 @@ public static class GamesEndpoints
                         // Appropriate endpoints filters will be applied and recognize data annotations specified in CreateGameDto
 
         // GET /games
-        group.MapGet("/", (GameStoreContext dbContext) => 
+        group.MapGet("/", async (GameStoreContext dbContext) => 
         {
-            return dbContext.Games
+            return await dbContext.Games
                         // Ensures Genre property is not null for correct mapping into game summary dto, includes Genre property for each Game
                         .Include(game => game.Genre)
                         .Select(game => game.ToGameSummaryDto())
                         // Tells EFC to not do any tracking of the return entities, just send it back to client for performance
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .ToListAsync();
         });
 
         // GET /games/1
-        group.MapGet("/{id}", (int id, GameStoreContext dbContext) => 
+        group.MapGet("/{id}", async (int id, GameStoreContext dbContext) => 
         {
-            Game? game = dbContext.Games.Find(id);
+            Game? game = await dbContext.Games.FindAsync(id);
             // Have to return value with type IResult, hence why we cannot just return 'game' in this case
             return game is null ? Results.NotFound() : Results.Ok(game.ToGameDetailsDto());
         })
         .WithName(GetGameEndpointName);
 
         // POST /games
-        group.MapPost("/", (CreateGameDto newGame, GameStoreContext dbContext) => 
+        group.MapPost("/", async (CreateGameDto newGame, GameStoreContext dbContext) => 
         {
             Game game = newGame.ToEntity();
             
             dbContext.Games.Add(game);
-            dbContext.SaveChanges();
+            await dbContext.SaveChangesAsync();
 
             // We should not return internal entities back to client, only our DTOs available hence why we're converting game into gameDto
 
@@ -62,9 +63,9 @@ public static class GamesEndpoints
         
 
         // PUT /games
-        group.MapPut("/{id}", (int id, UpdateGameDto updatedGame, GameStoreContext dbContext) => 
+        group.MapPut("/{id}", async (int id, UpdateGameDto updatedGame, GameStoreContext dbContext) => 
         {
-            var existingGame = dbContext.Games.Find(id);
+            var existingGame = await dbContext.Games.FindAsync(id);
             
             if (existingGame == null)
             {
@@ -75,18 +76,18 @@ public static class GamesEndpoints
                         .CurrentValues
                         .SetValues(updatedGame.ToEntity(id));
             
-            dbContext.SaveChanges();
+            await dbContext.SaveChangesAsync();
 
             // Convention is to return NoContent back to client for PUT operation
             return Results.NoContent();
         });
 
         // DELETE /games
-        group.MapDelete("/{id}", (int id, GameStoreContext dbContext) => 
+        group.MapDelete("/{id}", async (int id, GameStoreContext dbContext) => 
         {
-            dbContext.Games
+            await dbContext.Games
                         .Where(game => game.Id == id)
-                        .ExecuteDelete();
+                        .ExecuteDeleteAsync();
 
             return Results.NoContent();
         });
